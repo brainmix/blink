@@ -177,7 +177,6 @@ class SwServer extends Server
         if (!empty($request->files)) {
             $config['files'] = $this->normalizeFiles($request->files);
         }
-
         return app()->makeRequest($config);
     }
 

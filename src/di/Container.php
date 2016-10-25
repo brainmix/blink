@@ -1,7 +1,5 @@
 <?php
 /**
- * This file is modified from Yii framework 2 project.
- *
  * @link http://www.yiiframework.com/
  * @copyright Copyright (c) 2008 Yii Software LLC
  * @license http://www.yiiframework.com/license/
@@ -9,9 +7,9 @@
 
 namespace blink\di;
 
-use ReflectionClass;
-use blink\core\Object;
 use blink\core\InvalidConfigException;
+use blink\core\Object;
+use ReflectionClass;
 
 /**
  * Container implements a [dependency injection](http://en.wikipedia.org/wiki/Dependency_injection) container.
@@ -36,7 +34,7 @@ use blink\core\InvalidConfigException;
  * ```php
  * namespace app\models;
  *
- * use yii\core\Object;
+ * use yii\base\Object;
  * use yii\db\Connection;
  * use yii\di\Container;
  *
@@ -98,14 +96,6 @@ use blink\core\InvalidConfigException;
 class Container extends Object
 {
     /**
-     * @var static
-     */
-    public static $instance;
-    public static $app;
-
-
-
-    /**
      * @var array singleton objects indexed by their types
      */
     private $_singletons = [];
@@ -113,11 +103,6 @@ class Container extends Object
      * @var array object definitions indexed by their types
      */
     private $_definitions = [];
-
-    /**
-     * @var array type aliases indexed by alias.
-     */
-    private $_aliases = [];
     /**
      * @var array constructor parameters indexed by object types
      */
@@ -132,33 +117,16 @@ class Container extends Object
      */
     private $_dependencies = [];
 
-    /**
-     * Bind aliases for specified type.
-     *
-     * @param $type
-     * @param $alias
-     */
-    public function alias($type, $alias)
-    {
-        $this->_aliases[$alias] = $type;
-    }
-
-    /**
-     * Returns the real type of a alias.
-     *
-     * @param $alias
-     * @return string The real type name
-     */
-    public function getAlias($alias)
-    {
-        return isset($this->_aliases[$alias]) ? $this->_aliases[$alias] : $alias;
-    }
 
     /**
      * Returns an instance of the requested class.
      *
      * You may provide constructor parameters (`$params`) and object configurations (`$config`)
      * that will be used during the creation of the instance.
+     *
+     * If the class implements [[\yii\base\Configurable]], the `$config` parameter will be passed as the last
+     * parameter to the class constructor; Otherwise, the configuration will be applied *after* the object is
+     * instantiated.
      *
      * Note that if the class is declared to be singleton by calling [[setSingleton()]],
      * the same instance of the class will be returned each time this method is called.
@@ -173,11 +141,10 @@ class Container extends Object
      * @param array $config a list of name-value pairs that will be used to initialize the object properties.
      * @return object an instance of the requested class.
      * @throws InvalidConfigException if the class cannot be recognized or correspond to an invalid definition
+     * @throws NotInstantiableException If resolved to an abstract class or an interface (since 2.0.9)
      */
     public function get($class, $params = [], $config = [])
     {
-        $class = $this->getAlias($class);
-
         if (isset($this->_singletons[$class])) {
             // singleton
             return $this->_singletons[$class];
@@ -205,7 +172,7 @@ class Container extends Object
         } elseif (is_object($definition)) {
             return $this->_singletons[$class] = $definition;
         } else {
-            throw new InvalidConfigException("Unexpected object definition type: " . gettype($definition));
+            throw new InvalidConfigException('Unexpected object definition type: ' . gettype($definition));
         }
 
         if (array_key_exists($class, $this->_singletons)) {
@@ -264,7 +231,7 @@ class Container extends Object
      * You may use [[has()]] to check if a class definition already exists.
      *
      * @param string $class class name, interface name or alias name
-     * @param mixed $definition the definition associated with `$class`. It can be one of the followings:
+     * @param mixed $definition the definition associated with `$class`. It can be one of the following:
      *
      * - a PHP callable: The callable will be executed when [[get()]] is invoked. The signature of the callable
      *   should be `function ($container, $params, $config)`, where `$params` stands for the list of constructor
@@ -276,26 +243,13 @@ class Container extends Object
      * - a string: a class name, an interface name or an alias name.
      * @param array $params the list of constructor parameters. The parameters will be passed to the class
      * constructor when [[get()]] is called.
-     * @return static the container itself
+     * @return $this the container itself
      */
     public function set($class, $definition = [], array $params = [])
     {
-        $normalizedDefinition = $this->normalizeDefinition($class, $definition);
-
-        if (is_array($normalizedDefinition)) {
-            $concrete = $normalizedDefinition['class'];
-        } else {
-            $concrete = $class;
-        }
-
-        if ($class !== $concrete) {
-            $this->alias($concrete, $class);
-        }
-
-        $this->_definitions[$concrete] = $normalizedDefinition;
-        $this->_params[$concrete] = $params;
-        unset($this->_singletons[$concrete]);
-
+        $this->_definitions[$class] = $this->normalizeDefinition($class, $definition);
+        $this->_params[$class] = $params;
+        unset($this->_singletons[$class]);
         return $this;
     }
 
@@ -309,27 +263,14 @@ class Container extends Object
      * @param mixed $definition the definition associated with `$class`. See [[set()]] for more details.
      * @param array $params the list of constructor parameters. The parameters will be passed to the class
      * constructor when [[get()]] is called.
-     * @return static the container itself
+     * @return $this the container itself
      * @see set()
      */
     public function setSingleton($class, $definition = [], array $params = [])
     {
-        $normalizedDefinition = $this->normalizeDefinition($class, $definition);
-
-        if (is_array($normalizedDefinition)) {
-            $concrete = $normalizedDefinition['class'];
-        } else {
-            $concrete = $class;
-        }
-
-        if ($class !== $concrete) {
-            $this->alias($concrete, $class);
-        }
-
-        $this->_definitions[$concrete] = $normalizedDefinition;
-        $this->_params[$concrete] = $params;
-        $this->_singletons[$concrete] = null;
-
+        $this->_definitions[$class] = $this->normalizeDefinition($class, $definition);
+        $this->_params[$class] = $params;
+        $this->_singletons[$class] = null;
         return $this;
     }
 
@@ -341,7 +282,7 @@ class Container extends Object
      */
     public function has($class)
     {
-        return isset($this->_definitions[$this->getAlias($class)]);
+        return isset($this->_definitions[$class]);
     }
 
     /**
@@ -353,8 +294,6 @@ class Container extends Object
      */
     public function hasSingleton($class, $checkInstance = false)
     {
-        $class = $this->getAlias($class);
-
         return $checkInstance ? isset($this->_singletons[$class]) : array_key_exists($class, $this->_singletons);
     }
 
@@ -364,10 +303,7 @@ class Container extends Object
      */
     public function clear($class)
     {
-        $concrete = $this->getAlias($class);
-        unset ($this->_aliases[$class]);
-
-        unset($this->_definitions[$concrete], $this->_singletons[$concrete]);
+        unset($this->_definitions[$class], $this->_singletons[$class]);
     }
 
     /**
@@ -416,6 +352,7 @@ class Container extends Object
      * @param array $params constructor parameters
      * @param array $config configurations to be applied to the new instance
      * @return object the newly created instance of the specified class
+     * @throws NotInstantiableException If resolved to an abstract class or an interface (since 2.0.9)
      */
     protected function build($class, $params, $config)
     {
@@ -426,13 +363,19 @@ class Container extends Object
             $dependencies[$index] = $param;
         }
 
-        if (!empty($dependencies) && is_a($class, 'blink\core\Configurable', true)) {
+        $dependencies = $this->resolveDependencies($dependencies, $reflection);
+        if (!$reflection->isInstantiable()) {
+            throw new NotInstantiableException($reflection->name);
+        }
+        if (empty($config)) {
+            return $reflection->newInstanceArgs($dependencies);
+        }
+
+        if (!empty($dependencies) && $reflection->implementsInterface('blink\core\Configurable')) {
             // set $config as the last parameter (existing one will be overwritten)
             $dependencies[count($dependencies) - 1] = $config;
-            $dependencies = $this->resolveDependencies($dependencies, $reflection);
             return $reflection->newInstanceArgs($dependencies);
         } else {
-            $dependencies = $this->resolveDependencies($dependencies, $reflection);
             $object = $reflection->newInstanceArgs($dependencies);
             foreach ($config as $name => $value) {
                 $object->$name = $value;
@@ -515,5 +458,108 @@ class Container extends Object
             }
         }
         return $dependencies;
+    }
+
+    /**
+     * Invoke a callback with resolving dependencies in parameters.
+     *
+     * This methods allows invoking a callback and let type hinted parameter names to be
+     * resolved as objects of the Container. It additionally allow calling function using named parameters.
+     *
+     * For example, the following callback may be invoked using the Container to resolve the formatter dependency:
+     *
+     * ```php
+     * $formatString = function($string, \yii\i18n\Formatter $formatter) {
+     *    // ...
+     * }
+     * Yii::$container->invoke($formatString, ['string' => 'Hello World!']);
+     * ```
+     *
+     * This will pass the string `'Hello World!'` as the first param, and a formatter instance created
+     * by the DI container as the second param to the callable.
+     *
+     * @param callable $callback callable to be invoked.
+     * @param array $params The array of parameters for the function.
+     * This can be either a list of parameters, or an associative array representing named function parameters.
+     * @return mixed the callback return value.
+     * @throws InvalidConfigException if a dependency cannot be resolved or if a dependency cannot be fulfilled.
+     * @throws NotInstantiableException If resolved to an abstract class or an interface (since 2.0.9)
+     * @since 2.0.7
+     */
+    public function invoke(callable $callback, $params = [])
+    {
+        if (is_callable($callback)) {
+            return call_user_func_array($callback, $this->resolveCallableDependencies($callback, $params));
+        } else {
+            return call_user_func_array($callback, $params);
+        }
+    }
+
+    /**
+     * Resolve dependencies for a function.
+     *
+     * This method can be used to implement similar functionality as provided by [[invoke()]] in other
+     * components.
+     *
+     * @param callable $callback callable to be invoked.
+     * @param array $params The array of parameters for the function, can be either numeric or associative.
+     * @return array The resolved dependencies.
+     * @throws InvalidConfigException if a dependency cannot be resolved or if a dependency cannot be fulfilled.
+     * @throws NotInstantiableException If resolved to an abstract class or an interface (since 2.0.9)
+     * @since 2.0.7
+     */
+    public function resolveCallableDependencies(callable $callback, $params = [])
+    {
+        if (is_array($callback)) {
+            $reflection = new \ReflectionMethod($callback[0], $callback[1]);
+        } else {
+            $reflection = new \ReflectionFunction($callback);
+        }
+
+        $args = [];
+
+        $associative = ArrayHelper::isAssociative($params);
+
+        foreach ($reflection->getParameters() as $param) {
+            $name = $param->getName();
+            if (($class = $param->getClass()) !== null) {
+                $className = $class->getName();
+                if ($associative && isset($params[$name]) && $params[$name] instanceof $className) {
+                    $args[] = $params[$name];
+                    unset($params[$name]);
+                } elseif (!$associative && isset($params[0]) && $params[0] instanceof $className) {
+                    $args[] = array_shift($params);
+                } elseif (isset(Yii::$app) && Yii::$app->has($name) && ($obj = Yii::$app->get($name)) instanceof $className) {
+                    $args[] = $obj;
+                } else {
+                    // If the argument is optional we catch not instantiable exceptions
+                    try {
+                        $args[] = $this->get($className);
+                    } catch (NotInstantiableException $e) {
+                        if ($param->isDefaultValueAvailable()) {
+                            $args[] = $param->getDefaultValue();
+                        } else {
+                            throw $e;
+                        }
+                    }
+
+                }
+            } elseif ($associative && isset($params[$name])) {
+                $args[] = $params[$name];
+                unset($params[$name]);
+            } elseif (!$associative && count($params)) {
+                $args[] = array_shift($params);
+            } elseif ($param->isDefaultValueAvailable()) {
+                $args[] = $param->getDefaultValue();
+            } elseif (!$param->isOptional()) {
+                $funcName = $reflection->getName();
+                throw new InvalidConfigException("Missing required parameter \"$name\" when calling \"$funcName\".");
+            }
+        }
+
+        foreach ($params as $value) {
+            $args[] = $value;
+        }
+        return $args;
     }
 }

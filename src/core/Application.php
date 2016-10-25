@@ -2,6 +2,8 @@
 
 namespace blink\core;
 
+use blink\Blink;
+use blink\di\ServiceLocator;
 use Closure;
 use blink\di\Container;
 use FastRoute;
@@ -80,6 +82,9 @@ class Application extends ServiceLocator
     protected $refreshing = [];
     protected $lastError;
 
+    public function getBootstrapped(){
+        return $this->bootstrapped;
+    }
     public function init()
     {
         if (!$this->root || !file_exists($this->root)) {
@@ -88,8 +93,8 @@ class Application extends ServiceLocator
 
         $this->services = array_merge($this->defaultServices(), $this->services);
 
-        Container::$app = $this;
-        Container::$instance = new Container();
+        Blink::$app = $this;
+        Blink::$container = new Container();
     }
 
 

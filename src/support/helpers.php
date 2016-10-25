@@ -1,5 +1,6 @@
 <?php
 
+use blink\Blink;
 use blink\di\Container;
 use blink\core\InvalidConfigException;
 use blink\core\HttpException;
@@ -14,16 +15,16 @@ use blink\core\HttpException;
  */
 function make($type, $params = [])
 {
-    if (!Container::$instance) {
-        Container::$instance = new Container();
+    if (!Blink::$app) {
+        Blink::$container = new Container();
     }
 
     if (is_string($type)) {
-        return Container::$instance->get($type, $params);
+        return Blink::$container->get($type, $params);
     } elseif (is_array($type) && isset($type['class'])) {
         $class = $type['class'];
         unset($type['class']);
-        return Container::$instance->get($class, $params, $type);
+        return Blink::$container->get($class, $params, $type);
     } elseif (is_callable($type, true)) {
         return call_user_func($type, $params);
     } elseif (is_array($type)) {
@@ -42,9 +43,9 @@ function make($type, $params = [])
 function app($service = null)
 {
     if ($service === null) {
-        return Container::$app;
+        return Blink::$app;
     } else {
-        return Container::$app->get($service);
+        return Blink::$app->get($service);
     }
 }
 
@@ -55,7 +56,7 @@ function app($service = null)
  */
 function logger()
 {
-    return Container::$app->get('log');
+    return Blink::$app->get('log');
 }
 
 /**
@@ -65,7 +66,7 @@ function logger()
  */
 function session()
 {
-    return Container::$app->get('session');
+    return Blink::$app->get('session');
 }
 
 /**
@@ -75,7 +76,7 @@ function session()
  */
 function auth()
 {
-    return Container::$app->get('auth');
+    return Blink::$app->get('auth');
 }
 
 /**
@@ -85,7 +86,7 @@ function auth()
  */
 function request()
 {
-    return Container::$app->get('request');
+    return Blink::$app->get('request');
 }
 
 /**
@@ -95,7 +96,7 @@ function request()
  */
 function response()
 {
-    return Container::$app->get('response');
+    return Blink::$app->get('response');
 }
 
 
